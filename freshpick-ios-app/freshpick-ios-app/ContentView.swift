@@ -1,14 +1,30 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject var cartManager: CartManager
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView {
+            //Tab 1: The Store
+            HomeView()
+                .tabItem {
+                    Label("Shop", systemImage: "storefront")
+                }
+            
+            //Tab 2: Bundles (We will build this next)
+            Text("Bundles Screen") // Placeholder
+                .tabItem {
+                    Label("Favorites", systemImage: "heart.fill")
+                }
+            
+            //Tab 3: Cart (We will build this last)
+            Text("Cart: \(cartManager.cartItems.count) items") // Placeholder
+                .tabItem {
+                    Label("Cart", systemImage: "cart.fill")
+                }
+                .badge(cartManager.cartItems.reduce(0) { $0 + $1.quantity })
         }
-        .padding()
+        .accentColor(.green) // Main app color
     }
 }
 

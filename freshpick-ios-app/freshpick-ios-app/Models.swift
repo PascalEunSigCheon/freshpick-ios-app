@@ -20,13 +20,31 @@ enum Category: String, CaseIterable, Codable, Identifiable {
     case pantry = "Pantry" // Pasta, Rice, Canned goods
     case snacks = "Snacks"
     case beverages = "Beverages"
-    case breakfast = "Breakfast"   // Cereal, Oatmeal
-    case household = "Household"   // Cleaning supplies
+    case breakfast = "Breakfast" // Cereal, Oatmeal
+    case household = "Household" // Cleaning supplies
     case personalCare = "Personal Care"
     case pets = "Pet Supplies"
     
     // Conformance to Identifiable so we can loop in SwiftUI
     var id: String { self.rawValue }
+    
+    var iconName: String {
+        switch self {
+        case .fruits: return "applelogo"
+        case .vegetables: return "carrot.fill"
+        case .bakery: return "birthday.cake.fill"
+        case .dairy: return "drop.fill"
+        case .meat: return "flame.fill"
+        case .frozen: return "snowflake"
+        case .pantry: return "fork.knife"
+        case .snacks: return "popcorn.fill"
+        case .beverages: return "mug.fill"
+        case .breakfast: return "sun.max.fill"
+        case .household: return "house.fill"
+        case .personalCare: return "heart.fill"
+        case .pets: return "pawprint.fill"
+        }
+    }
 }
 
 struct CartItem: Identifiable, Codable {
@@ -59,7 +77,7 @@ struct OrderItem: Identifiable, Codable {
     var id = UUID()
     let product: Product
     let quantity: Int
-    let frozenPrice: Double // Stores the price user actually paid
+    let frozenPrice: Double
 }
 
 struct Order: Identifiable, Codable {
@@ -69,7 +87,7 @@ struct Order: Identifiable, Codable {
     let pickupTime: Date
     let date: Date
     var status: OrderStatus
-    let totalAmount: Double  // Stored for fast access in "My Orders"
+    let totalAmount: Double
     
     var items: [OrderItem]
 }
