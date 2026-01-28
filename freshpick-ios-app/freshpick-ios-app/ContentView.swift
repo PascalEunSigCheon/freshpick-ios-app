@@ -18,7 +18,7 @@ struct ContentView: View {
                 }
             
             //Tab 3: Cart (We will build this last)
-            Text("Cart: \(cartManager.cartItems.count) items") // Placeholder
+            CartView()
                 .tabItem {
                     Label("Cart", systemImage: "cart.fill")
                 }
