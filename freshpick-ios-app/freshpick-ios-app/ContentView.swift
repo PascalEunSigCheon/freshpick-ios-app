@@ -11,10 +11,10 @@ struct ContentView: View {
                     Label("Shop", systemImage: "storefront")
                 }
             
-            //Tab 2: Bundles (We will build this next)
-            Text("Bundles Screen") // Placeholder
+            //Tab 2: Bundles
+            BundlesView()
                 .tabItem {
-                    Label("Favorites", systemImage: "heart.fill")
+                    Label("Bundles", systemImage: "square.stack.3d.up.fill")
                 }
             
             //Tab 3: Cart (We will build this last)
@@ -30,4 +30,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(CartManager())
 }
