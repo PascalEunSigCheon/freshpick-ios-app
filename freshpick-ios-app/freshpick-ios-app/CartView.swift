@@ -4,16 +4,23 @@ struct CartView: View {
     @EnvironmentObject var cartManager: CartManager
     
     @State private var pickupDate: Date = Date()
-    @State private var showOrderConfirmation: Bool = false
+    @State private var selectedFulfillment: FulfillmentMethod = .pickup
+    @State private var selectedTipPercent: Double = 0.0
+    private let taxRate: Double = 0.08
     
-    private let serviceFee: Double = 2.50
+    @State private var showOrderConfirmation: Bool = false
     
     private var itemsTotal: Double {
         cartManager.cartTotal
     }
     
-    private var grandTotal: Double {
-        itemsTotal + (itemsTotal > 0 ? serviceFee : 0)
+    private var breakdown: PriceBreakdown {
+        PricingEngine.calculate(
+            itemsTotal: itemsTotal,
+            fulfillment: selectedFulfillment,
+            tipPercent: selectedTipPercent,
+            taxRate: taxRate
+        )
     }
     
     var body: some View {
@@ -78,27 +85,61 @@ struct CartView: View {
                 Text("Items Total")
                     .foregroundColor(.secondary)
                 Spacer()
-                Text(itemsTotal, format: .currency(code: "USD"))
+                Text(formatMoney(breakdown.itemsTotal))
+                    .foregroundColor(.primary)
             }
             
+            HStack {
+                Text("Delivery Fee")
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(formatMoney(breakdown.deliveryFee))
+                    .foregroundColor(.primary)
+            }
+
             HStack {
                 Text("Service Fee")
                     .foregroundColor(.secondary)
                 Spacer()
-                Text(itemsTotal > 0 ? serviceFee : 0, format: .currency(code: "USD"))
+                Text(formatMoney(breakdown.serviceFee))
+                    .foregroundColor(.primary)
+            }
+
+            if breakdown.smallOrderFee > 0 {
+                HStack {
+                    Text("Small Order Fee")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(formatMoney(breakdown.smallOrderFee))
+                        .foregroundColor(.primary)
+                }
+            }
+
+            HStack {
+                Text("Tax")
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(formatMoney(breakdown.tax))
+                    .foregroundColor(.primary)
+            }
+
+            HStack {
+                Text("Tip")
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(formatMoney(breakdown.tip))
+                    .foregroundColor(.primary)
             }
             
             Divider()
                 .padding(.vertical, 4)
             
             HStack {
-                Text("Grand Total")
-                    .font(.title3)
-                    .bold()
+                Text("Total")
+                    .font(.headline)
                 Spacer()
-                Text(grandTotal, format: .currency(code: "USD"))
-                    .font(.title3)
-                    .bold()
+                Text(formatMoney(breakdown.grandTotal))
+                    .font(.headline)
                     .foregroundColor(.green)
             }
         }
@@ -114,21 +155,36 @@ struct CartView: View {
                 .font(.headline)
                 .foregroundColor(.secondary)
             
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Pickup Name")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                HStack {
-                    Image(systemName: "person.fill")
-                        .foregroundColor(.green)
-                    
-                    Text(cartManager.currentUser.name) // Locked Name
-                        .bold()
-                    
-                    Spacer()
-                    
-                    Image(systemName: "lock.fill") // Lock Icon
+            VStack(alignment: .leading, spacing: 12) {
+                // Fulfillment Method
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Fulfillment")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Picker("Fulfillment", selection: $selectedFulfillment) {
+                        Text("Pickup").tag(FulfillmentMethod.pickup)
+                        Text("Delivery").tag(FulfillmentMethod.delivery)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                // Tip
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Tip")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Picker("Tip", selection: $selectedTipPercent) {
+                        Text("0%").tag(0.0)
+                        Text("10%").tag(0.10)
+                        Text("15%").tag(0.15)
+                        Text("20%").tag(0.20)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                // Pickup name field
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Pickup Name")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -168,16 +224,16 @@ struct CartView: View {
                     Text("Place Order")
                         .font(.headline)
                     Spacer()
-                    Text(grandTotal, format: .currency(code: "USD"))
+                    Text(formatMoney(breakdown.grandTotal))
                         .font(.headline)
                 }
                 .foregroundColor(.white)
                 .padding()
                 .frame(maxWidth: .infinity)
-                .background(cartManager.cartItems.isEmpty ? Color.gray : Color.green)
+                .background(placeOrderDisabled ? Color.gray : Color.green)
                 .cornerRadius(18)
             }
-            .disabled(cartManager.cartItems.isEmpty)
+            .disabled(placeOrderDisabled)
             .padding(.horizontal)
             .padding(.top, 6)
             .padding(.bottom, 8)
@@ -189,6 +245,11 @@ struct CartView: View {
     }
     
     // MARK: - Actions
+    private var placeOrderDisabled: Bool {
+        let name = pickupName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cartManager.cartItems.isEmpty || name.isEmpty
+    }
+
     private func placeOrder() {
         guard !cartManager.cartItems.isEmpty else { return }
         
@@ -198,6 +259,11 @@ struct CartView: View {
         )
         
         showOrderConfirmation = true
+    }
+
+    private func formatMoney(_ value: Double) -> String {
+        let rounded = (value * 100).rounded() / 100
+        return String(format: "$%.2f", rounded)
     }
 }
 
