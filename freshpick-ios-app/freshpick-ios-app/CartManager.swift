@@ -2,20 +2,35 @@ import Foundation
 import SwiftUI
 import Combine
 
+// MARK: - 1. THE MOCK USER (Scrooge)
+struct MockUser: Codable {
+    var name = "Scrooge McDuck"
+    var email = "profit@moneybin.duckburg"
+    var phone = "(555) NUM-1-DIME"
+    var memberID = "RICHEST-DUCK-001"
+}
+
 @MainActor
 class CartManager: ObservableObject {
+    
+    // MARK: - 2. SHARED STATE
     @Published var cartItems: [CartItem] = []
     @Published var savedBundles: [SavedBundle] = []
     @Published var pastOrders: [Order] = []
     
+    // Keys for persistence
     private let bundlesKey = "savedBundles_v1"
     private let ordersKey = "pastOrders_v1"
+    
+    // The "Logged In" User
+    let currentUser = MockUser()
     
     init() {
         loadData()
     }
     
-    /// Adds a product to the cart. If it exists, increases quantity.
+    // MARK: - 3. CART ACTIONS
+    
     func addToCart(product: Product, quantity: Int = 1) {
         if let index = cartItems.firstIndex(where: { $0.product.id == product.id }) {
             cartItems[index].quantity += quantity
@@ -24,33 +39,29 @@ class CartManager: ObservableObject {
         }
     }
     
-    /// Removes items from the cart list (swipe to delete)
     func removeFromCart(at offsets: IndexSet) {
         cartItems.remove(atOffsets: offsets)
     }
     
-    /// Updates the quantity of a specific item (for the Stepper +/-)
     func updateQuantity(cartItemID: UUID, newQuantity: Int) {
         if let index = cartItems.firstIndex(where: { $0.id == cartItemID }) {
             if newQuantity > 0 {
                 cartItems[index].quantity = newQuantity
             } else {
-                // Optional: Remove if quantity goes to 0
                 cartItems.remove(at: index)
             }
         }
     }
     
-    /// Calculates the total price of everything in the active cart
     var cartTotal: Double {
         cartItems.reduce(0) { $0 + ($1.product.price * Double($1.quantity)) }
     }
     
-    /// Saves the CURRENT cart as a new Bundle
+    // MARK: - 4. BUNDLE ACTIONS
+    
     func createBundleFromCart(name: String) {
         guard !cartItems.isEmpty else { return }
         
-        // Convert CartItems -> BundleItems
         let bundleItems = cartItems.map {
             BundleItem(product: $0.product, quantity: $0.quantity)
         }
@@ -65,7 +76,6 @@ class CartManager: ObservableObject {
         saveBundlesToDisk()
     }
     
-    /// The "Killer Feature": Adds an entire bundle to the cart
     func addBundleToCart(_ bundle: SavedBundle) {
         for item in bundle.items {
             addToCart(product: item.product, quantity: item.quantity)
@@ -77,9 +87,11 @@ class CartManager: ObservableObject {
         saveBundlesToDisk()
     }
     
-    /// Moves items from Cart -> Order History and starts the timer
-    func placeOrder(userName: String, pickupTime: Date, storeLocation: String) {
-        // 1. Snapshot the items (Freeze the price!)
+    // MARK: - 5. ORDER & SIMULATION LOGIC
+    
+    func placeOrder(pickupTime: Date, storeLocation: String) {
+        
+        // 1. Snapshot items
         let orderItems = cartItems.map {
             OrderItem(
                 product: $0.product,
@@ -88,10 +100,10 @@ class CartManager: ObservableObject {
             )
         }
         
-        // 2. Create the Order
+        // 2. Create Order (Always uses Current User)
         var newOrder = Order(
             id: UUID(),
-            userName: userName,
+            userName: currentUser.name,
             storeLocation: storeLocation,
             pickupTime: pickupTime,
             date: Date(),
@@ -100,35 +112,37 @@ class CartManager: ObservableObject {
             items: orderItems
         )
         
-        // 3. Save to history and clear cart
-        pastOrders.insert(newOrder, at: 0) // Add to top of list
+        // 3. Save & Clear
+        pastOrders.insert(newOrder, at: 0)
         cartItems.removeAll()
         saveOrdersToDisk()
         
-        // 4. Start the Simulation (The "Fake" Server)
+        // 4. Start Simulation
         simulateOrderStatus(for: newOrder.id)
     }
     
-    
     private func simulateOrderStatus(for orderID: UUID) {
-        // After 5 seconds -> PACKING
+        // Step 1: Wait 5 seconds -> PACKING
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             self.updateStatus(for: orderID, to: .packing)
         }
         
-        // After 10 seconds -> READY
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+        // Step 2: Wait 15 seconds -> READY
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
             self.updateStatus(for: orderID, to: .ready)
         }
     }
     
     private func updateStatus(for orderID: UUID, to status: OrderStatus) {
         if let index = pastOrders.firstIndex(where: { $0.id == orderID }) {
-            pastOrders[index].status = status
-            saveOrdersToDisk() // Save the new status
+            withAnimation {
+                pastOrders[index].status = status
+            }
+            saveOrdersToDisk()
         }
     }
     
+    // MARK: - 6. PERSISTENCE
     private func saveBundlesToDisk() {
         if let encoded = try? JSONEncoder().encode(savedBundles) {
             UserDefaults.standard.set(encoded, forKey: bundlesKey)
@@ -142,13 +156,11 @@ class CartManager: ObservableObject {
     }
     
     private func loadData() {
-        // Load Bundles
         if let data = UserDefaults.standard.data(forKey: bundlesKey),
            let decoded = try? JSONDecoder().decode([SavedBundle].self, from: data) {
             savedBundles = decoded
         }
         
-        // Load Orders
         if let data = UserDefaults.standard.data(forKey: ordersKey),
            let decoded = try? JSONDecoder().decode([Order].self, from: data) {
             pastOrders = decoded

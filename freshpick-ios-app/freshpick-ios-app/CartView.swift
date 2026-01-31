@@ -3,20 +3,16 @@ import SwiftUI
 struct CartView: View {
     @EnvironmentObject var cartManager: CartManager
     
-    // Pickup details
-    @State private var pickupName: String = ""
     @State private var pickupDate: Date = Date()
-    
     @State private var showOrderConfirmation: Bool = false
     
-    // Simple flat service fee to match the mock
     private let serviceFee: Double = 2.50
     
     private var itemsTotal: Double {
         cartManager.cartTotal
     }
     
-    private var subtotal: Double {
+    private var grandTotal: Double {
         itemsTotal + (itemsTotal > 0 ? serviceFee : 0)
     }
     
@@ -40,7 +36,7 @@ struct CartView: View {
                             .padding(.horizontal)
                             .padding(.top, 12)
                             
-                            // MARK: - Cart Items
+                            // MARK: - Cart Items List
                             VStack(spacing: 12) {
                                 ForEach(cartManager.cartItems) { item in
                                     CartItemRow(cartItem: item)
@@ -49,18 +45,18 @@ struct CartView: View {
                             }
                             .padding(.horizontal)
                             
-                            // MARK: - Summary Card
-                            summaryCard
+                            // MARK: - Pickup Details (Locked to Scrooge)
+                            pickupDetailsCard
                                 .padding(.horizontal)
                             
-                            // MARK: - Pickup Details
-                            pickupDetailsCard
+                            // MARK: - Summary Card
+                            summaryCard
                                 .padding(.horizontal)
                                 .padding(.bottom, 16)
                         }
                     }
                     
-                    // MARK: - Bottom Place Order Bar
+                    // MARK: - Bottom Bar
                     bottomBar
                 }
             }
@@ -69,20 +65,20 @@ struct CartView: View {
             .alert("Order Placed", isPresented: $showOrderConfirmation) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Your order is being processed and will be ready for pickup soon.")
+                Text("Total charged: \(grandTotal.formatted(.currency(code: "USD")))")
             }
         }
     }
     
-    // MARK: - Summary Card
+    // MARK: - Subviews
+    
     private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Items Total")
                     .foregroundColor(.secondary)
                 Spacer()
                 Text(itemsTotal, format: .currency(code: "USD"))
-                    .foregroundColor(.primary)
             }
             
             HStack {
@@ -90,17 +86,19 @@ struct CartView: View {
                     .foregroundColor(.secondary)
                 Spacer()
                 Text(itemsTotal > 0 ? serviceFee : 0, format: .currency(code: "USD"))
-                    .foregroundColor(.primary)
             }
             
             Divider()
+                .padding(.vertical, 4)
             
             HStack {
-                Text("Subtotal")
-                    .font(.headline)
+                Text("Grand Total")
+                    .font(.title3)
+                    .bold()
                 Spacer()
-                Text(subtotal, format: .currency(code: "USD"))
-                    .font(.headline)
+                Text(grandTotal, format: .currency(code: "USD"))
+                    .font(.title3)
+                    .bold()
                     .foregroundColor(.green)
             }
         }
@@ -110,69 +108,51 @@ struct CartView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
     
-    // MARK: - Pickup Details Card
     private var pickupDetailsCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Pickup Details")
                 .font(.headline)
                 .foregroundColor(.secondary)
             
-            VStack(alignment: .leading, spacing: 12) {
-                // Pickup name field
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Pickup Name")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    HStack {
-                        Image(systemName: "person.fill")
-                            .foregroundColor(.secondary)
-                        TextField("Who's picking this up?", text: $pickupName)
-                            .textInputAutocapitalization(.words)
-                    }
-                    .padding(12)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Pickup Name")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 
-                // Pickup schedule
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Pickup Schedule")
+                HStack {
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.green)
+                    
+                    Text(cartManager.currentUser.name) // Locked Name
+                        .bold()
+                    
+                    Spacer()
+                    
+                    Image(systemName: "lock.fill") // Lock Icon
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
-                    HStack(spacing: 12) {
-                        // Date
-                        HStack {
-                            Image(systemName: "calendar")
-                                .foregroundColor(.secondary)
-                            DatePicker(
-                                "",
-                                selection: $pickupDate,
-                                displayedComponents: [.date]
-                            )
-                            .labelsHidden()
-                        }
-                        .padding(10)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(12)
-                        
-                        // Time
-                        HStack {
-                            Image(systemName: "clock")
-                                .foregroundColor(.secondary)
-                            DatePicker(
-                                "",
-                                selection: $pickupDate,
-                                displayedComponents: [.hourAndMinute]
-                            )
-                            .labelsHidden()
-                        }
-                        .padding(10)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(12)
-                    }
                 }
+                .padding(12)
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+            }
+            
+            // Time picker
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Pickup Time")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                HStack {
+                    Image(systemName: "clock")
+                        .foregroundColor(.gray)
+                    
+                    DatePicker("", selection: $pickupDate, displayedComponents: [.hourAndMinute])
+                        .labelsHidden()
+                }
+                .padding(10)
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
             }
         }
         .padding(18)
@@ -181,15 +161,14 @@ struct CartView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
     
-    // MARK: - Bottom Bar
     private var bottomBar: some View {
-        VStack(spacing: 8) {
+        VStack {
             Button(action: placeOrder) {
                 HStack {
                     Text("Place Order")
                         .font(.headline)
                     Spacer()
-                    Text(subtotal, format: .currency(code: "USD"))
+                    Text(grandTotal, format: .currency(code: "USD"))
                         .font(.headline)
                 }
                 .foregroundColor(.white)
@@ -213,29 +192,22 @@ struct CartView: View {
     private func placeOrder() {
         guard !cartManager.cartItems.isEmpty else { return }
         
-        let name = pickupName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalName = name.isEmpty ? "Guest" : name
-        
         cartManager.placeOrder(
-            userName: finalName,
             pickupTime: pickupDate,
             storeLocation: "FreshPick Market"
         )
         
-        pickupName = ""
-        pickupDate = Date()
         showOrderConfirmation = true
     }
 }
 
-// MARK: - Cart Item Row
+// MARK: - Cart Item Row Helper
 struct CartItemRow: View {
     let cartItem: CartItem
     @EnvironmentObject var cartManager: CartManager
     
     var body: some View {
         HStack(spacing: 12) {
-            // Image
             Image(cartItem.product.imageName)
                 .resizable()
                 .scaledToFill()
@@ -243,7 +215,6 @@ struct CartItemRow: View {
                 .clipped()
                 .cornerRadius(14)
             
-            // Info
             VStack(alignment: .leading, spacing: 6) {
                 Text(cartItem.product.name)
                     .font(.headline)
@@ -256,39 +227,36 @@ struct CartItemRow: View {
             
             Spacer()
             
-            // Quantity Controls
             HStack(spacing: 12) {
-                quantityButton(systemName: "minus") {
-                    let newQuantity = cartItem.quantity - 1
-                    cartManager.updateQuantity(cartItemID: cartItem.id, newQuantity: newQuantity)
+                Button(action: {
+                    cartManager.updateQuantity(cartItemID: cartItem.id, newQuantity: cartItem.quantity - 1)
+                }) {
+                    Image(systemName: "minus")
+                        .frame(width: 30, height: 30)
+                        .background(Color.green.opacity(0.1))
+                        .foregroundColor(.green)
+                        .clipShape(Circle())
                 }
                 
                 Text("\(cartItem.quantity)")
                     .font(.headline)
-                    .frame(minWidth: 22)
+                    .frame(minWidth: 20)
                 
-                quantityButton(systemName: "plus") {
-                    let newQuantity = cartItem.quantity + 1
-                    cartManager.updateQuantity(cartItemID: cartItem.id, newQuantity: newQuantity)
+                Button(action: {
+                    cartManager.updateQuantity(cartItemID: cartItem.id, newQuantity: cartItem.quantity + 1)
+                }) {
+                    Image(systemName: "plus")
+                        .frame(width: 30, height: 30)
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .clipShape(Circle())
                 }
             }
+            .buttonStyle(.plain)
         }
         .padding(12)
         .background(Color.white)
         .cornerRadius(18)
         .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 3)
     }
-    
-    private func quantityButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 16, weight: .bold))
-                .frame(width: 32, height: 32)
-                .background(Color.green)
-                .foregroundColor(.white)
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-    }
 }
-
