@@ -6,28 +6,46 @@ struct CartView: View {
     @State private var pickupDate: Date = Date()
     @State private var selectedFulfillment: FulfillmentMethod = .pickup
     @State private var selectedTipPercent: Double = 0.0
-    private let taxRate: Double = 0.08
-    
     @State private var showOrderConfirmation: Bool = false
     
-    private var itemsTotal: Double {
-        cartManager.cartTotal
+    @State private var lastOrderTotal: Double = 0.0
+    
+    enum FulfillmentMethod: String, CaseIterable {
+        case pickup = "Pickup"
+        case delivery = "Delivery"
     }
     
-    private var breakdown: PriceBreakdown {
-        PricingEngine.calculate(
-            itemsTotal: itemsTotal,
-            fulfillment: selectedFulfillment,
-            tipPercent: selectedTipPercent,
-            taxRate: taxRate
-        )
+    // MARK: - Price Calculations
+    private var itemsTotal: Double { cartManager.cartTotal }
+    
+    private var deliveryFee: Double {
+        selectedFulfillment == .delivery ? 5.99 : 0.0
+    }
+    
+    private var serviceFee: Double {
+        itemsTotal > 0 ? 2.50 : 0.0
+    }
+    
+    private var smallOrderFee: Double {
+        (itemsTotal > 0 && itemsTotal < 15.0) ? 1.99 : 0.0
+    }
+    
+    private var tax: Double {
+        itemsTotal * 0.08
+    }
+    
+    private var tip: Double {
+        itemsTotal * selectedTipPercent
+    }
+    
+    private var grandTotal: Double {
+        itemsTotal + deliveryFee + serviceFee + smallOrderFee + tax + tip
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+                Color(.systemGroupedBackground).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     ScrollView {
@@ -36,12 +54,10 @@ struct CartView: View {
                             // MARK: - Items Header
                             HStack {
                                 Text("Items (\(cartManager.cartItems.reduce(0) { $0 + $1.quantity }))")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
+                                    .font(.headline).foregroundColor(.secondary)
                                 Spacer()
                             }
-                            .padding(.horizontal)
-                            .padding(.top, 12)
+                            .padding(.horizontal).padding(.top, 12)
                             
                             // MARK: - Cart Items List
                             VStack(spacing: 12) {
@@ -52,14 +68,11 @@ struct CartView: View {
                             }
                             .padding(.horizontal)
                             
-                            // MARK: - Pickup Details (Locked to Scrooge)
-                            pickupDetailsCard
-                                .padding(.horizontal)
+                            // MARK: - Fulfillment & Tip
+                            pickupDetailsCard.padding(.horizontal)
                             
                             // MARK: - Summary Card
-                            summaryCard
-                                .padding(.horizontal)
-                                .padding(.bottom, 16)
+                            summaryCard.padding(.horizontal).padding(.bottom, 16)
                         }
                     }
                     
@@ -72,107 +85,64 @@ struct CartView: View {
             .alert("Order Placed", isPresented: $showOrderConfirmation) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Total charged: \(grandTotal.formatted(.currency(code: "USD")))")
+                Text("Total charged: \(lastOrderTotal.formatted(.currency(code: "USD")))")
             }
         }
     }
     
     // MARK: - Subviews
-    
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Items Total")
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(formatMoney(breakdown.itemsTotal))
-                    .foregroundColor(.primary)
-            }
-            
-            HStack {
-                Text("Delivery Fee")
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(formatMoney(breakdown.deliveryFee))
-                    .foregroundColor(.primary)
-            }
-
-            HStack {
-                Text("Service Fee")
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(formatMoney(breakdown.serviceFee))
-                    .foregroundColor(.primary)
-            }
-
-            if breakdown.smallOrderFee > 0 {
-                HStack {
-                    Text("Small Order Fee")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(formatMoney(breakdown.smallOrderFee))
-                        .foregroundColor(.primary)
+            Group {
+                HStack { Text("Items Total").foregroundColor(.secondary); Spacer(); Text(formatMoney(itemsTotal)) }
+                
+                if deliveryFee > 0 {
+                    HStack { Text("Delivery Fee").foregroundColor(.secondary); Spacer(); Text(formatMoney(deliveryFee)) }
+                }
+                
+                HStack { Text("Service Fee").foregroundColor(.secondary); Spacer(); Text(formatMoney(serviceFee)) }
+                
+                if smallOrderFee > 0 {
+                    HStack { Text("Small Order Fee").foregroundColor(.secondary); Spacer(); Text(formatMoney(smallOrderFee)) }
+                }
+                
+                HStack { Text("Tax (8%)").foregroundColor(.secondary); Spacer(); Text(formatMoney(tax)) }
+                
+                if tip > 0 {
+                    HStack { Text("Tip").foregroundColor(.secondary); Spacer(); Text(formatMoney(tip)) }
                 }
             }
-
-            HStack {
-                Text("Tax")
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(formatMoney(breakdown.tax))
-                    .foregroundColor(.primary)
-            }
-
-            HStack {
-                Text("Tip")
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(formatMoney(breakdown.tip))
-                    .foregroundColor(.primary)
-            }
             
-            Divider()
-                .padding(.vertical, 4)
-            
+            Divider().padding(.vertical, 4)
             HStack {
-                Text("Total")
-                    .font(.headline)
+                Text("Total").font(.headline)
                 Spacer()
-                Text(formatMoney(breakdown.grandTotal))
-                    .font(.headline)
-                    .foregroundColor(.green)
+                Text(formatMoney(grandTotal)).font(.headline).foregroundColor(.green)
             }
         }
-        .padding(18)
-        .background(Color.white)
-        .cornerRadius(18)
+        .padding(18).background(Color.white).cornerRadius(18)
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
     
     private var pickupDetailsCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Pickup Details")
-                .font(.headline)
-                .foregroundColor(.secondary)
+            Text("Details").font(.headline).foregroundColor(.secondary)
             
             VStack(alignment: .leading, spacing: 12) {
-                // Fulfillment Method
+                
+                // Fulfillment Segmented Control
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Fulfillment")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Text("Fulfillment").font(.caption).foregroundColor(.secondary)
                     Picker("Fulfillment", selection: $selectedFulfillment) {
                         Text("Pickup").tag(FulfillmentMethod.pickup)
                         Text("Delivery").tag(FulfillmentMethod.delivery)
                     }
                     .pickerStyle(.segmented)
                 }
-
-                // Tip
+                
+                // Tip Segmented Control
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Tip")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Text("Tip").font(.caption).foregroundColor(.secondary)
                     Picker("Tip", selection: $selectedTipPercent) {
                         Text("0%").tag(0.0)
                         Text("10%").tag(0.10)
@@ -181,39 +151,31 @@ struct CartView: View {
                     }
                     .pickerStyle(.segmented)
                 }
-
-                // Pickup name field
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Pickup Name")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(12)
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(12)
-            }
-            
-            // Time picker
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Pickup Time")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
                 
-                HStack {
-                    Image(systemName: "clock")
-                        .foregroundColor(.gray)
-                    
-                    DatePicker("", selection: $pickupDate, displayedComponents: [.hourAndMinute])
-                        .labelsHidden()
+                // Locked User Name
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Pickup Name").font(.caption).foregroundColor(.secondary)
+                    HStack {
+                        Image(systemName: "person.fill").foregroundColor(.green)
+                        Text(cartManager.currentUser.name).bold()
+                        Spacer()
+                        Image(systemName: "lock.fill").font(.caption).foregroundColor(.secondary)
+                    }
+                    .padding(12).background(Color(.secondarySystemBackground)).cornerRadius(12)
                 }
-                .padding(10)
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(12)
+                
+                // Date Picker
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Time").font(.caption).foregroundColor(.secondary)
+                    HStack {
+                        Image(systemName: "clock").foregroundColor(.gray)
+                        DatePicker("", selection: $pickupDate, displayedComponents: [.hourAndMinute]).labelsHidden()
+                    }
+                    .padding(10).background(Color(.secondarySystemBackground)).cornerRadius(12)
+                }
             }
         }
-        .padding(18)
-        .background(Color.white)
-        .cornerRadius(18)
+        .padding(18).background(Color.white).cornerRadius(18)
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
     
@@ -221,53 +183,40 @@ struct CartView: View {
         VStack {
             Button(action: placeOrder) {
                 HStack {
-                    Text("Place Order")
-                        .font(.headline)
+                    Text("Place Order").font(.headline)
                     Spacer()
-                    Text(formatMoney(breakdown.grandTotal))
-                        .font(.headline)
+                    Text(formatMoney(grandTotal)).font(.headline)
                 }
-                .foregroundColor(.white)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(placeOrderDisabled ? Color.gray : Color.green)
+                .foregroundColor(.white).padding().frame(maxWidth: .infinity)
+                .background(cartManager.cartItems.isEmpty ? Color.gray : Color.green)
                 .cornerRadius(18)
             }
-            .disabled(placeOrderDisabled)
-            .padding(.horizontal)
-            .padding(.top, 6)
-            .padding(.bottom, 8)
+            .disabled(cartManager.cartItems.isEmpty)
+            .padding(.horizontal).padding(.top, 6).padding(.bottom, 8)
         }
-        .background(
-            Color(.systemGroupedBackground)
-                .ignoresSafeArea(edges: .bottom)
-        )
+        .background(Color(.systemGroupedBackground).ignoresSafeArea(edges: .bottom))
     }
     
     // MARK: - Actions
-    private var placeOrderDisabled: Bool {
-        let name = pickupName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return cartManager.cartItems.isEmpty || name.isEmpty
-    }
-
     private func placeOrder() {
         guard !cartManager.cartItems.isEmpty else { return }
         
-        cartManager.placeOrder(
-            pickupTime: pickupDate,
-            storeLocation: "FreshPick Market"
-        )
+        // Save the total before clearing cart
+        lastOrderTotal = grandTotal
         
+        // Place order (clears cart)
+        cartManager.placeOrder(pickupTime: pickupDate, storeLocation: "FreshPick Market")
+        
+        // Show confirmation
         showOrderConfirmation = true
     }
-
+    
     private func formatMoney(_ value: Double) -> String {
-        let rounded = (value * 100).rounded() / 100
-        return String(format: "$%.2f", rounded)
+        return value.formatted(.currency(code: "USD"))
     }
 }
 
-// MARK: - Cart Item Row Helper
+// MARK: - Cart Item Row
 struct CartItemRow: View {
     let cartItem: CartItem
     @EnvironmentObject var cartManager: CartManager
