@@ -10,16 +10,14 @@ struct UserProfileView: View {
     var body: some View {
         NavigationStack {
             List {
-                // SECTION 1: USER ID CARD
                 Section {
                     HStack(spacing: 15) {
-                        // SCROOGE IMAGE
-                        Image("scrooge") // Make sure "scrooge" is in Assets!
+                        Image("scrooge")
                             .resizable()
                             .scaledToFill()
                             .frame(width: 70, height: 70)
                             .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.yellow, lineWidth: 3)) // Gold border
+                            .overlay(Circle().stroke(Color.yellow, lineWidth: 3))
                             .shadow(radius: 3)
                         
                         VStack(alignment: .leading, spacing: 5) {
@@ -39,11 +37,9 @@ struct UserProfileView: View {
                     .padding(.vertical, 8)
                 }
                 
-                // SECTION 2: LIVE ORDER TRACKER
                 if !activeOrders.isEmpty {
                     Section("Live Orders") {
                         ForEach(activeOrders) { order in
-                            // WRAP IN NAVIGATION LINK
                             NavigationLink(destination: OrderDetailView(order: order)) {
                                 VStack(alignment: .leading, spacing: 15) {
                                     HStack {
@@ -55,7 +51,6 @@ struct UserProfileView: View {
                                             .foregroundColor(.gray)
                                     }
                                     
-                                    // STATUS BAR VISUALIZER
                                     StatusProgressBar(status: order.status)
                                     
                                     HStack {
@@ -66,12 +61,11 @@ struct UserProfileView: View {
                                         
                                         Spacer()
                                         
-                                        // Item count preview
                                         Text("\(order.items.count) items")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                         
-                                        Text("$\(order.totalAmount, specifier: "%.2f")")
+                                        Text("$\(order.grandTotal, specifier: "%.2f")")
                                             .font(.caption)
                                             .bold()
                                     }
@@ -82,7 +76,6 @@ struct UserProfileView: View {
                     }
                 }
                 
-                // SECTION 3: PREFERRED ITEMS
                 Section("Saved Bundles") {
                     if cartManager.savedBundles.isEmpty {
                         Text("No saved favorites yet.")
@@ -95,17 +88,20 @@ struct UserProfileView: View {
                                 Text(bundle.name)
                                 Spacer()
                                 Button(action: {
-                                    cartManager.addBundleToCart(bundle)
+                                    withAnimation {
+                                        cartManager.addBundleToCart(bundle)
+                                    }
                                 }) {
                                     Image(systemName: "plus.circle.fill")
                                         .foregroundColor(.green)
                                 }
+                                .buttonStyle(BorderlessButtonStyle())
                             }
                         }
+                        .onDelete(perform: cartManager.deleteBundle)
                     }
                 }
                 
-                // SECTION 4: SETTINGS
                 Section("Settings") {
                     Label("Payment Methods", systemImage: "creditcard")
                     Label("Notifications", systemImage: "bell")
@@ -116,17 +112,8 @@ struct UserProfileView: View {
             .navigationTitle("Profile")
         }
     }
-        
-    func completeOrder(_ order: Order) {
-        if let index = cartManager.pastOrders.firstIndex(where: { $0.id == order.id }) {
-            withAnimation {
-                cartManager.pastOrders[index].status = .completed
-            }
-        }
-    }
 }
 
-// Helper: Status Bar
 struct StatusProgressBar: View {
     let status: OrderStatus
     

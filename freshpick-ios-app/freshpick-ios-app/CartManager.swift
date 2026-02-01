@@ -18,9 +18,8 @@ class CartManager: ObservableObject {
     @Published var savedBundles: [SavedBundle] = []
     @Published var pastOrders: [Order] = []
     
-    // Keys for persistence
     private let bundlesKey = "savedBundles_v1"
-    private let ordersKey = "pastOrders_v1"
+    private let ordersKey = "pastOrders_v2"
     
     let currentUser = MockUser()
     
@@ -66,12 +65,7 @@ class CartManager: ObservableObject {
             BundleItem(product: $0.product, quantity: $0.quantity)
         }
         
-        let newBundle = SavedBundle(
-            name: name,
-            items: bundleItems,
-            createdAt: Date()
-        )
-        
+        let newBundle = SavedBundle(name: name, items: bundleItems, createdAt: Date())
         savedBundles.append(newBundle)
         saveBundlesToDisk()
     }
@@ -88,7 +82,7 @@ class CartManager: ObservableObject {
     }
     
     // MARK: - 5. ORDER & SIMULATION LOGIC
-    func placeOrder(pickupTime: Date, storeLocation: String) {
+    func placeOrder(pickupTime: Date, storeLocation: String, itemsTotal: Double, deliveryFee: Double, smallOrderFee: Double, tax: Double, tip: Double, grandTotal: Double) {
         
         let orderItems = cartItems.map {
             OrderItem(
@@ -105,7 +99,14 @@ class CartManager: ObservableObject {
             pickupTime: pickupTime,
             date: Date(),
             status: .processing,
-            totalAmount: cartTotal,
+            
+            itemsTotal: itemsTotal,
+            deliveryFee: deliveryFee,
+            smallOrderFee: smallOrderFee,
+            tax: tax,
+            tip: tip,
+            grandTotal: grandTotal,
+            
             items: orderItems
         )
         
@@ -117,13 +118,11 @@ class CartManager: ObservableObject {
     }
     
     private func simulateOrderStatus(for orderID: UUID) {
-        // Step 1: Wait 5 seconds -> PACKING
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             self.updateStatus(for: orderID, to: .packing)
         }
         
-        // Step 2: Wait 30 seconds -> READY
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
             self.updateStatus(for: orderID, to: .ready)
         }
     }
@@ -162,76 +161,34 @@ class CartManager: ObservableObject {
         }
     }
     
-    /// Creates sample bundles matching the design mockup
+    // MARK: - 7. SAMPLE BUNDLES (Mock Data)
     private func createSampleBundles() {
         let products = ProductDatabase.products
         
-        // Helper to find product by name
         func findProduct(_ name: String) -> Product? {
             return products.first { $0.name.localizedCaseInsensitiveContains(name) }
         }
         
-        // Study Snacks Bundle
         var studySnacksItems: [BundleItem] = []
-        if let almonds = findProduct("Almonds") { studySnacksItems.append(BundleItem(product: almonds, quantity: 2)) }
         if let apples = findProduct("Apple") { studySnacksItems.append(BundleItem(product: apples, quantity: 3)) }
-        if let yogurt = findProduct("Yogurt") { studySnacksItems.append(BundleItem(product: yogurt, quantity: 4)) }
-        if let chips = findProduct("Chips") { studySnacksItems.append(BundleItem(product: chips, quantity: 2)) }
-        if let bananas = findProduct("Banana") { studySnacksItems.append(BundleItem(product: bananas, quantity: 1)) }
-        if let strawberries = findProduct("Strawberry") { studySnacksItems.append(BundleItem(product: strawberries, quantity: 1)) }
-        if let cheese = findProduct("Cheese") { studySnacksItems.append(BundleItem(product: cheese, quantity: 1)) }
+        if let bananas = findProduct("Banana") { studySnacksItems.append(BundleItem(product: bananas, quantity: 2)) }
+        if let chocolate = findProduct("Chocolate") { studySnacksItems.append(BundleItem(product: chocolate, quantity: 1)) }
         
-        let studySnacks = SavedBundle(
-            name: "Study Snacks",
-            items: studySnacksItems,
-            createdAt: Date().addingTimeInterval(-86400 * 5)
-        )
+        if !studySnacksItems.isEmpty {
+            let studySnacks = SavedBundle(name: "Study Snacks", items: studySnacksItems, createdAt: Date())
+            savedBundles.append(studySnacks)
+        }
         
-        // Weekly Essentials Bundle
-        var weeklyEssentialsItems: [BundleItem] = []
-        if let milk = findProduct("Milk") { weeklyEssentialsItems.append(BundleItem(product: milk, quantity: 2)) }
-        if let eggs = findProduct("Eggs") { weeklyEssentialsItems.append(BundleItem(product: eggs, quantity: 2)) }
-        if let bread = findProduct("Bread") { weeklyEssentialsItems.append(BundleItem(product: bread, quantity: 2)) }
-        if let spinach = findProduct("Spinach") { weeklyEssentialsItems.append(BundleItem(product: spinach, quantity: 2)) }
-        if let chicken = findProduct("Chicken") { weeklyEssentialsItems.append(BundleItem(product: chicken, quantity: 2)) }
-        if let bananas = findProduct("Banana") { weeklyEssentialsItems.append(BundleItem(product: bananas, quantity: 2)) }
-        if let apples = findProduct("Apple") { weeklyEssentialsItems.append(BundleItem(product: apples, quantity: 2)) }
-        if let tomatoes = findProduct("Tomato") { weeklyEssentialsItems.append(BundleItem(product: tomatoes, quantity: 2)) }
-        if let carrots = findProduct("Carrot") { weeklyEssentialsItems.append(BundleItem(product: carrots, quantity: 2)) }
-        if let broccoli = findProduct("Broccoli") { weeklyEssentialsItems.append(BundleItem(product: broccoli, quantity: 2)) }
-        if let cheese = findProduct("Cheese") { weeklyEssentialsItems.append(BundleItem(product: cheese, quantity: 1)) }
-        if let yogurt = findProduct("Yogurt") { weeklyEssentialsItems.append(BundleItem(product: yogurt, quantity: 2)) }
-        if let oil = findProduct("Oil") { weeklyEssentialsItems.append(BundleItem(product: oil, quantity: 1)) }
-        if let rice = findProduct("Rice") { weeklyEssentialsItems.append(BundleItem(product: rice, quantity: 1)) }
-        if let pasta = findProduct("Pasta") { weeklyEssentialsItems.append(BundleItem(product: pasta, quantity: 1)) }
-        if let potatoes = findProduct("Potato") { weeklyEssentialsItems.append(BundleItem(product: potatoes, quantity: 2)) }
-        if let bagels = findProduct("Bagels") { weeklyEssentialsItems.append(BundleItem(product: bagels, quantity: 1)) }
-        if let salmon = findProduct("Salmon") { weeklyEssentialsItems.append(BundleItem(product: salmon, quantity: 1)) }
+        var tacoItems: [BundleItem] = []
+        if let cheese = findProduct("Cheese") { tacoItems.append(BundleItem(product: cheese, quantity: 1)) }
+        if let avocado = findProduct("Avocado") { tacoItems.append(BundleItem(product: avocado, quantity: 2)) }
+        if let meat = findProduct("Beef") { tacoItems.append(BundleItem(product: meat, quantity: 1)) }
         
-        let weeklyEssentials = SavedBundle(
-            name: "Weekly Essentials",
-            items: weeklyEssentialsItems,
-            createdAt: Date().addingTimeInterval(-86400 * 3) // 3 days ago
-        )
+        if !tacoItems.isEmpty {
+            let tacoNight = SavedBundle(name: "Taco Night", items: tacoItems, createdAt: Date())
+            savedBundles.append(tacoNight)
+        }
         
-        // Taco Night Bundle
-        var tacoNightItems: [BundleItem] = []
-        if let beef = findProduct("Beef") { tacoNightItems.append(BundleItem(product: beef, quantity: 1)) }
-        if let cheese = findProduct("Cheese") { tacoNightItems.append(BundleItem(product: cheese, quantity: 1)) }
-        if let lemon = findProduct("Lemon") { tacoNightItems.append(BundleItem(product: lemon, quantity: 2)) }
-        if let tomatoes = findProduct("Tomato") { tacoNightItems.append(BundleItem(product: tomatoes, quantity: 2)) }
-        if let spinach = findProduct("Spinach") { tacoNightItems.append(BundleItem(product: spinach, quantity: 1)) }
-        if let peppers = findProduct("Pepper") { tacoNightItems.append(BundleItem(product: peppers, quantity: 2)) }
-        if let yogurt = findProduct("Yogurt") { tacoNightItems.append(BundleItem(product: yogurt, quantity: 1)) }
-        if let chips = findProduct("Chips") { tacoNightItems.append(BundleItem(product: chips, quantity: 1)) }
-        
-        let tacoNight = SavedBundle(
-            name: "Taco Night",
-            items: tacoNightItems,
-            createdAt: Date().addingTimeInterval(-86400 * 1)
-        )
-        
-        savedBundles = [studySnacks, weeklyEssentials, tacoNight]
         saveBundlesToDisk()
     }
 }

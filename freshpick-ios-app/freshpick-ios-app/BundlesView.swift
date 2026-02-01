@@ -1,9 +1,21 @@
 import SwiftUI
 
+enum BundleSheetType: Identifiable {
+    case new
+    case edit(SavedBundle)
+    
+    var id: String {
+        switch self {
+        case .new: return "new"
+        case .edit(let bundle): return bundle.id.uuidString
+        }
+    }
+}
+
 struct BundlesView: View {
     @EnvironmentObject var cartManager: CartManager
-    @State private var showCreateBundle = false
-    @State private var editingBundle: SavedBundle? = nil
+    
+    @State private var activeSheet: BundleSheetType? = nil
     
     var body: some View {
         NavigationStack {
@@ -38,8 +50,7 @@ struct BundlesView: View {
                                         BundleCard(
                                             bundle: bundle,
                                             onEdit: {
-                                                editingBundle = bundle
-                                                showCreateBundle = true
+                                                activeSheet = .edit(bundle)
                                             }
                                         )
                                         .environmentObject(cartManager)
@@ -54,23 +65,14 @@ struct BundlesView: View {
             }
             .navigationTitle("Smart Bundles")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {}) {
-                        Image(systemName: "ellipsis")
-                            .foregroundColor(.primary)
-                    }
-                }
-            }
-            .sheet(isPresented: $showCreateBundle) {
-                if let bundle = editingBundle {
-                    CreateBundleView(bundle: bundle)
+            
+            .sheet(item: $activeSheet) { sheetType in
+                switch sheetType {
+                case .new:
+                    CreateBundleView(bundle: nil)
                         .environmentObject(cartManager)
-                        .onDisappear {
-                            editingBundle = nil
-                        }
-                } else {
-                    CreateBundleView()
+                case .edit(let bundle):
+                    CreateBundleView(bundle: bundle)
                         .environmentObject(cartManager)
                 }
             }
@@ -80,8 +82,7 @@ struct BundlesView: View {
     // MARK: - Create Bundle Button
     private var createBundleButton: some View {
         Button(action: {
-            editingBundle = nil
-            showCreateBundle = true
+            activeSheet = .new
         }) {
             HStack {
                 ZStack {
@@ -122,7 +123,7 @@ struct BundlesView: View {
     }
 }
 
-// MARK: - Bundle Card
+// MARK: - Bundle Card (No changes needed here, just context)
 struct BundleCard: View {
     let bundle: SavedBundle
     let onEdit: () -> Void
@@ -130,9 +131,7 @@ struct BundleCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Image Header
             ZStack(alignment: .topTrailing) {
-                // Use first item's image, or a default
                 if let firstItem = bundle.items.first {
                     Image(firstItem.product.imageName)
                         .resizable()
@@ -144,20 +143,19 @@ struct BundleCard: View {
                         .frame(height: 180)
                 }
                 
-                // Edit Icon
                 Button(action: onEdit) {
                     Image(systemName: "pencil")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.black)
                         .padding(8)
-                        .background(Color.white.opacity(0.9))
+                        .background(Color.white)
                         .clipShape(Circle())
+                        .shadow(radius: 2)
                 }
                 .padding(12)
             }
             
             VStack(alignment: .leading, spacing: 12) {
-                // Title and Details
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(bundle.name)
@@ -177,11 +175,9 @@ struct BundleCard: View {
                                 .foregroundColor(.green)
                         }
                     }
-                    
                     Spacer()
                 }
                 
-                // Item List Preview
                 Text(bundle.itemsPreview)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -189,11 +185,12 @@ struct BundleCard: View {
                 
                 // Add All to Cart Button
                 Button(action: {
-                    cartManager.addBundleToCart(bundle)
+                    withAnimation {
+                        cartManager.addBundleToCart(bundle)
+                    }
                 }) {
                     HStack {
-                        Image(systemName: "cart.fill")
-                            .font(.system(size: 14))
+                        Image(systemName: "cart.badge.plus")
                         Text("Add All to Cart")
                             .font(.headline)
                     }
@@ -211,181 +208,3 @@ struct BundleCard: View {
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
 }
-
-// MARK: - SavedBundle Extensions
-extension SavedBundle {
-    var totalPrice: Double {
-        items.reduce(0) { $0 + ($1.product.price * Double($1.quantity)) }
-    }
-    
-    var itemsPreview: String {
-        let itemNames = items.map { $0.product.name }
-        let preview = itemNames.prefix(6).joined(separator: ", ")
-        if itemNames.count > 6 {
-            return preview + "..."
-        }
-        return preview
-    }
-}
-
-// MARK: - Create Bundle View
-struct CreateBundleView: View {
-    @EnvironmentObject var cartManager: CartManager
-    @Environment(\.dismiss) var dismiss
-    
-    let bundle: SavedBundle?
-    
-    @State private var bundleName: String = ""
-    @State private var selectedProducts: [Product] = []
-    @State private var productQuantities: [UUID: Int] = [:]
-    
-    init(bundle: SavedBundle? = nil) {
-        self.bundle = bundle
-    }
-    
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Form {
-                    Section("Bundle Name") {
-                        TextField("Enter bundle name", text: $bundleName)
-                    }
-                    
-                    Section("Add Products") {
-                        ForEach(ProductDatabase.products) { product in
-                            ProductSelectionRow(
-                                product: product,
-                                quantity: productQuantities[product.id] ?? 0,
-                                onQuantityChange: { newQuantity in
-                                    if newQuantity > 0 {
-                                        productQuantities[product.id] = newQuantity
-                                        if !selectedProducts.contains(where: { $0.id == product.id }) {
-                                            selectedProducts.append(product)
-                                        }
-                                    } else {
-                                        productQuantities.removeValue(forKey: product.id)
-                                        selectedProducts.removeAll { $0.id == product.id }
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-                
-                // Save Button
-                Button(action: saveBundle) {
-                    Text(bundle == nil ? "Create Bundle" : "Update Bundle")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(canSave ? Color.green : Color.gray)
-                        .cornerRadius(12)
-                }
-                .disabled(!canSave)
-                .padding()
-            }
-            .navigationTitle(bundle == nil ? "New Bundle" : "Edit Bundle")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                if let bundle = bundle {
-                    bundleName = bundle.name
-                    selectedProducts = bundle.items.map { $0.product }
-                    productQuantities = Dictionary(uniqueKeysWithValues: bundle.items.map { ($0.product.id, $0.quantity) })
-                }
-            }
-        }
-    }
-    
-    private var canSave: Bool {
-        !bundleName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !selectedProducts.isEmpty
-    }
-    
-    private func saveBundle() {
-        guard canSave else { return }
-        
-        let bundleItems = selectedProducts.compactMap { product -> BundleItem? in
-            guard let quantity = productQuantities[product.id], quantity > 0 else { return nil }
-            return BundleItem(product: product, quantity: quantity)
-        }
-        
-        if let existingBundle = bundle {
-            // Update existing bundle - create new instance since SavedBundle is a struct
-            if let index = cartManager.savedBundles.firstIndex(where: { $0.id == existingBundle.id }) {
-                var updatedBundle = cartManager.savedBundles[index]
-                updatedBundle.name = bundleName
-                updatedBundle.items = bundleItems
-                cartManager.savedBundles[index] = updatedBundle
-                cartManager.saveBundlesToDisk()
-            }
-        } else {
-            // Create new bundle
-            let newBundle = SavedBundle(
-                name: bundleName,
-                items: bundleItems,
-                createdAt: Date()
-            )
-            cartManager.savedBundles.append(newBundle)
-            cartManager.saveBundlesToDisk()
-        }
-        
-        dismiss()
-    }
-}
-
-// MARK: - Product Selection Row
-struct ProductSelectionRow: View {
-    let product: Product
-    let quantity: Int
-    let onQuantityChange: (Int) -> Void
-    
-    var body: some View {
-        HStack {
-            Image(product.imageName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 50, height: 50)
-                .clipped()
-                .cornerRadius(8)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(product.name)
-                    .font(.subheadline)
-                Text("$\(product.price, specifier: "%.2f")")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 12) {
-                Button(action: {
-                    onQuantityChange(max(0, quantity - 1))
-                }) {
-                    Image(systemName: "minus.circle.fill")
-                        .foregroundColor(quantity > 0 ? .green : .gray)
-                }
-                
-                Text("\(quantity)")
-                    .font(.headline)
-                    .frame(minWidth: 30)
-                
-                Button(action: {
-                    onQuantityChange(quantity + 1)
-                }) {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundColor(.green)
-                }
-            }
-        }
-    }
-}
-

@@ -25,7 +25,6 @@ enum Category: String, CaseIterable, Codable, Identifiable {
     case personalCare = "Personal Care"
     case pets = "Pet Supplies"
     
-    // Conformance to Identifiable so we can loop in SwiftUI
     var id: String { self.rawValue }
     
     var iconName: String {
@@ -87,7 +86,31 @@ struct Order: Identifiable, Codable {
     let pickupTime: Date
     let date: Date
     var status: OrderStatus
-    let totalAmount: Double
+    
+    // Financial Breakdown
+    let itemsTotal: Double
+    let deliveryFee: Double
+    let smallOrderFee: Double
+    let tax: Double
+    let tip: Double
+    let grandTotal: Double
     
     var items: [OrderItem]
+}
+
+extension SavedBundle {
+    var totalPrice: Double {
+        items.reduce(0) { $0 + ($1.product.price * Double($1.quantity)) }
+    }
+    
+    var itemsPreview: String {
+        let itemNames = items.map { $0.product.name }
+        let limit = 3
+        let preview = itemNames.prefix(limit).joined(separator: ", ")
+        
+        if itemNames.count > limit {
+            return "\(preview), and \(itemNames.count - limit) more"
+        }
+        return preview
+    }
 }

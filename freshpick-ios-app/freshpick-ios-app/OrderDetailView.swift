@@ -40,19 +40,56 @@ struct OrderDetailView: View {
                         
                         Spacer()
                         
-
                         Text("$\(item.frozenPrice * Double(item.quantity), specifier: "%.2f")")
                             .foregroundColor(.secondary)
                     }
                 }
             }
             
-            Section {
+            Section("Payment Summary") {
                 HStack {
-                    Text("Total")
+                    Text("Items Subtotal").foregroundColor(.secondary)
+                    Spacer()
+                    Text(formatMoney(order.itemsTotal))
+                }
+                
+                if order.deliveryFee > 0 {
+                    HStack {
+                        Text("Delivery Fee").foregroundColor(.secondary)
+                        Spacer()
+                        Text(formatMoney(order.deliveryFee))
+                    }
+                }
+                
+                if order.smallOrderFee > 0 {
+                    HStack {
+                        Text("Small Order Fee").foregroundColor(.secondary)
+                        Spacer()
+                        Text(formatMoney(order.smallOrderFee))
+                    }
+                }
+                
+                HStack {
+                    Text("Tax").foregroundColor(.secondary)
+                    Spacer()
+                    Text(formatMoney(order.tax))
+                }
+                
+                if order.tip > 0 {
+                    HStack {
+                        Text("Tip").foregroundColor(.secondary)
+                        Spacer()
+                        Text(formatMoney(order.tip))
+                    }
+                }
+                
+                Divider()
+                
+                HStack {
+                    Text("Grand Total")
                         .font(.headline)
                     Spacer()
-                    Text("$\(order.totalAmount, specifier: "%.2f")")
+                    Text(formatMoney(order.grandTotal))
                         .font(.headline)
                         .foregroundColor(.green)
                 }
@@ -79,6 +116,7 @@ struct OrderDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
     
+    // MARK: - Helpers
     private var statusColor: Color {
         switch order.status {
         case .ready: return .green
@@ -92,7 +130,11 @@ struct OrderDetailView: View {
             withAnimation {
                 cartManager.pastOrders[index].status = .completed
             }
-            dismiss() // Go back to profile after pickup
+            dismiss()
         }
+    }
+    
+    private func formatMoney(_ value: Double) -> String {
+        return value.formatted(.currency(code: "USD"))
     }
 }

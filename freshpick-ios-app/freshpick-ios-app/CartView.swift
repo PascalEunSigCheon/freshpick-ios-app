@@ -26,7 +26,9 @@ struct CartView: View {
         selectedFulfillment == .delivery ? 5.99 : 0.0
     }
     
-    // NOTE: Service Fee removed as requested
+    private var serviceFee: Double {
+        itemsTotal > 0 ? 2.50 : 0.0
+    }
     
     private var smallOrderFee: Double {
         (itemsTotal > 0 && itemsTotal < 15.0) ? 1.99 : 0.0
@@ -41,7 +43,7 @@ struct CartView: View {
     }
     
     private var grandTotal: Double {
-        itemsTotal + deliveryFee + smallOrderFee + tax + tip
+        itemsTotal + deliveryFee + serviceFee + smallOrderFee + tax + tip
     }
     
     var body: some View {
@@ -70,7 +72,7 @@ struct CartView: View {
                             }
                             .padding(.horizontal)
                             
-                            // MARK: - Fulfillment Details (Address/Store & Time)
+                            // MARK: - Fulfillment Details
                             fulfillmentDetailsCard.padding(.horizontal)
                             
                             // MARK: - Summary Card
@@ -93,7 +95,6 @@ struct CartView: View {
     }
     
     // MARK: - Subviews
-    
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Group {
@@ -101,6 +102,10 @@ struct CartView: View {
                 
                 if deliveryFee > 0 {
                     HStack { Text("Delivery Fee").foregroundColor(.secondary); Spacer(); Text(formatMoney(deliveryFee)) }
+                }
+                
+                if serviceFee > 0 {
+                    HStack { Text("Service Fee").foregroundColor(.secondary); Spacer(); Text(formatMoney(serviceFee)) }
                 }
                 
                 if smallOrderFee > 0 {
@@ -132,7 +137,6 @@ struct CartView: View {
             
             VStack(alignment: .leading, spacing: 12) {
                 
-                // 1. Fulfillment Switcher
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Method").font(.caption).foregroundColor(.secondary)
                     Picker("Fulfillment", selection: $selectedFulfillment) {
@@ -142,7 +146,6 @@ struct CartView: View {
                     .pickerStyle(.segmented)
                 }
                 
-                // 2. DYNAMIC INPUT (Address vs Store)
                 if selectedFulfillment == .delivery {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Delivery Address").font(.caption).foregroundColor(.secondary)
@@ -169,7 +172,6 @@ struct CartView: View {
                     }
                 }
                 
-                // 3. User Name (Locked to Scrooge)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Contact Name").font(.caption).foregroundColor(.secondary)
                     HStack {
@@ -181,7 +183,6 @@ struct CartView: View {
                     .padding(12).background(Color(.secondarySystemBackground)).cornerRadius(12)
                 }
                 
-                // 4. Time Selector
                 VStack(alignment: .leading, spacing: 6) {
                     Text(selectedFulfillment == .delivery ? "Estimated Arrival" : "Pickup Time")
                         .font(.caption).foregroundColor(.secondary)
@@ -192,7 +193,6 @@ struct CartView: View {
                     .padding(10).background(Color(.secondarySystemBackground)).cornerRadius(12)
                 }
                 
-                // 5. Tip Selector
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Driver Tip").font(.caption).foregroundColor(.secondary)
                     Picker("Tip", selection: $selectedTipPercent) {
@@ -229,29 +229,33 @@ struct CartView: View {
     }
     
     // MARK: - Actions
-    
     private var placeOrderDisabled: Bool {
         if cartManager.cartItems.isEmpty { return true }
-        // If delivery, address must not be empty
         if selectedFulfillment == .delivery && deliveryAddress.trimmingCharacters(in: .whitespaces).isEmpty {
             return true
         }
         return false
     }
     
+    // MARK: - FIXED PLACE ORDER FUNCTION
     private func placeOrder() {
         guard !placeOrderDisabled else { return }
         
-        // 1. Snapshot the total
         lastOrderTotal = grandTotal
         
-        // 2. Determine location string
         let locationString = selectedFulfillment == .delivery ? "Delivery: \(deliveryAddress)" : "Pickup: \(selectedStore)"
         
-        // 3. Place Order (Clears Cart)
-        cartManager.placeOrder(pickupTime: pickupDate, storeLocation: locationString)
+        cartManager.placeOrder(
+            pickupTime: pickupDate,
+            storeLocation: locationString,
+            itemsTotal: itemsTotal,
+            deliveryFee: deliveryFee,
+            smallOrderFee: smallOrderFee,
+            tax: tax,
+            tip: tip,
+            grandTotal: grandTotal
+        )
         
-        // 4. Show Alert
         showOrderConfirmation = true
     }
     
@@ -260,14 +264,13 @@ struct CartView: View {
     }
 }
 
-// MARK: - MISSING HELPER COMPONENT (CartItemRow)
+// MARK: - Cart Item Row
 struct CartItemRow: View {
     let cartItem: CartItem
     @EnvironmentObject var cartManager: CartManager
     
     var body: some View {
         HStack(spacing: 12) {
-            // Product Image
             Image(cartItem.product.imageName)
                 .resizable()
                 .scaledToFill()
@@ -275,7 +278,6 @@ struct CartItemRow: View {
                 .clipped()
                 .cornerRadius(14)
             
-            // Name & Price
             VStack(alignment: .leading, spacing: 6) {
                 Text(cartItem.product.name)
                     .font(.headline)
@@ -288,7 +290,6 @@ struct CartItemRow: View {
             
             Spacer()
             
-            // Quantity Stepper Buttons
             HStack(spacing: 12) {
                 Button(action: {
                     cartManager.updateQuantity(cartItemID: cartItem.id, newQuantity: cartItem.quantity - 1)
