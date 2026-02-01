@@ -43,37 +43,41 @@ struct UserProfileView: View {
                 if !activeOrders.isEmpty {
                     Section("Live Orders") {
                         ForEach(activeOrders) { order in
-                            VStack(alignment: .leading, spacing: 15) {
-                                HStack {
-                                    Text("Order #\(order.id.uuidString.prefix(4))")
-                                        .bold()
-                                    Spacer()
-                                    Text(order.storeLocation)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                StatusProgressBar(status: order.status)
-                                
-                                HStack {
-                                    Text("Status: \(order.status.rawValue)")
-                                        .font(.subheadline)
-                                        .bold()
-                                        .foregroundColor(.green)
+                            // WRAP IN NAVIGATION LINK
+                            NavigationLink(destination: OrderDetailView(order: order)) {
+                                VStack(alignment: .leading, spacing: 15) {
+                                    HStack {
+                                        Text("Order #\(order.id.uuidString.prefix(4))")
+                                            .bold()
+                                        Spacer()
+                                        Text(order.storeLocation)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
                                     
-                                    Spacer()
+                                    // STATUS BAR VISUALIZER
+                                    StatusProgressBar(status: order.status)
                                     
-                                    if order.status == .ready {
-                                        Button("I'm Here") {
-                                            completeOrder(order)
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(.green)
-                                        .font(.caption)
+                                    HStack {
+                                        Text(order.status.rawValue.capitalized)
+                                            .font(.subheadline)
+                                            .bold()
+                                            .foregroundColor(.green)
+                                        
+                                        Spacer()
+                                        
+                                        // Item count preview
+                                        Text("\(order.items.count) items")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Text("$\(order.totalAmount, specifier: "%.2f")")
+                                            .font(.caption)
+                                            .bold()
                                     }
                                 }
+                                .padding(.vertical, 8)
                             }
-                            .padding(.vertical, 8)
                         }
                     }
                 }
